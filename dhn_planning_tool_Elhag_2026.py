@@ -271,8 +271,7 @@ OVERPASS_TIMEOUT_S = 90
 OVERPASS_BACKOFF_S = [10, 20, 40]
 # The public servers reject requests without a meaningful User-Agent (HTTP 406/429).
 # Put your own name or e-mail here.
-OVERPASS_USER_AGENT = "DHN-Planner/1.0 (THI master thesis; contact: your-email@example.com)"
-
+OVERPASS_USER_AGENT = "DHN-Planner/1.0 (THI master thesis; contact: mohamedadlyelhag@gmail.com)"
 
 def _set_overpass(url: str):
     for attr in ("overpass_url", "overpass_endpoint"):      # 2.x / 1.x name
@@ -2482,10 +2481,19 @@ city = st.text_input("Enter City (e.g., 'Paris, France', 'New York, USA')", "Ing
 if city and city != st.session_state.get("_last_geocoded_city"):
     try:
         with st.spinner(f"Locating {city}..."):
-            loc = ox.geocode_to_gdf(city)
-            centroid = loc.to_crs(epsg=4326).geometry.centroid.iloc[0]
-            st.session_state.city_location = [centroid.y, centroid.x]
-            st.session_state.map_center = [centroid.y, centroid.x]
+            try:
+                loc = ox.geocode_to_gdf(city)
+                c = loc.to_crs(epsg=4326).geometry.centroid.iloc[0]
+                lat, lon = c.y, c.x
+            except Exception:
+                import requests
+                r = requests.get("https://photon.komoot.io/api/",
+                                 params={"q": city, "limit": 1},
+                                 headers={"User-Agent": OVERPASS_USER_AGENT}, timeout=20)
+                r.raise_for_status()
+                lon, lat = r.json()["features"][0]["geometry"]["coordinates"]
+            st.session_state.city_location = [lat, lon]
+            st.session_state.map_center = [lat, lon]
             st.session_state.map_zoom = 14
             st.session_state._last_geocoded_city = city
             st.session_state._map_locked_to_project = False  # allow re-center when buildings load
